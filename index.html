@@ -1,0 +1,367 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nuan</title>
+<style>
+  :root {
+    color-scheme: dark; /* 常にダークモードで表示 */
+    --bg: #16181c;
+    --card: #1f2329;
+    --text: #e8e8e6;
+    --muted: #9aa0a6;
+    --accent: #2fa47c;
+    --accent-text: #0d1a15;
+    --border: #2c3138;
+    --chip: #262b31;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, "Hiragino Sans", "Noto Sans JP", "Segoe UI", sans-serif;
+    line-height: 1.6;
+    -webkit-text-size-adjust: 100%;
+  }
+  .wrap { max-width: 640px; margin: 0 auto; padding: 20px 16px 48px; }
+  h1 { font-size: 20px; font-weight: 600; margin: 8px 0 4px; }
+  .sub { color: var(--muted); font-size: 13px; margin: 0 0 20px; }
+
+  /* 入力エリア */
+  textarea {
+    width: 100%;
+    min-height: 120px;
+    padding: 14px;
+    font-size: 16px; /* 16px未満だとスマホで画面が勝手に拡大するため */
+    font-family: inherit;
+    color: var(--text);
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    resize: vertical;
+  }
+  textarea:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+  /* 方向の切り替え（自動 / 日→英 / 英→日） */
+  .modes { display: flex; gap: 8px; margin: 12px 0; }
+  .mode-btn {
+    flex: 1; min-height: 44px; padding: 8px;
+    font-size: 14px; font-family: inherit; color: var(--text);
+    background: var(--chip); border: 1px solid var(--border);
+    border-radius: 10px; cursor: pointer;
+  }
+  .mode-btn.active { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+
+  .translate-btn {
+    width: 100%; min-height: 52px; margin-top: 4px;
+    font-size: 17px; font-weight: 600; font-family: inherit;
+    color: var(--accent-text); background: var(--accent);
+    border: none; border-radius: 12px; cursor: pointer;
+  }
+  .translate-btn:disabled { opacity: 0.55; cursor: default; }
+
+  .status { min-height: 22px; margin: 12px 2px; font-size: 14px; color: var(--muted); }
+  .status.error { color: #c0392b; }
+
+  /* 結果カード */
+  .card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 12px; padding: 14px; margin-bottom: 12px;
+  }
+  .card-label { font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+  .card-text { font-size: 17px; white-space: pre-wrap; word-break: break-word; }
+  .copy-btn {
+    margin-top: 12px; min-height: 44px; width: 100%;
+    font-size: 15px; font-family: inherit; color: var(--accent);
+    background: transparent; border: 1.5px solid var(--accent);
+    border-radius: 10px; cursor: pointer;
+  }
+  .copy-btn.done { background: var(--accent); color: var(--accent-text); }
+
+  /* 履歴 */
+  .hist-head { display: flex; justify-content: space-between; align-items: center; margin: 28px 0 8px; }
+  .hist-head h2 { font-size: 15px; font-weight: 600; margin: 0; }
+  .clear-btn { font-size: 13px; font-family: inherit; color: var(--muted); background: none; border: none; cursor: pointer; text-decoration: underline; }
+  .hist-item {
+    display: flex; justify-content: space-between; gap: 10px; align-items: center;
+    width: 100%; text-align: left; min-height: 48px; padding: 10px 12px; margin-bottom: 8px;
+    font-size: 14px; font-family: inherit; color: var(--text);
+    background: var(--card); border: 1px solid var(--border); border-radius: 10px; cursor: pointer;
+  }
+  .hist-input { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .hist-dir { flex: none; font-size: 12px; color: var(--muted); }
+  .hist-empty { color: var(--muted); font-size: 14px; }
+
+  /* APIキー設定 */
+  .key-row { display: flex; gap: 8px; margin-bottom: 16px; }
+  .key-row input {
+    flex: 1; min-height: 44px; padding: 0 12px;
+    font-size: 16px; font-family: inherit; color: var(--text);
+    background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+  }
+  .key-row button {
+    min-height: 44px; padding: 0 16px;
+    font-size: 15px; font-family: inherit; font-weight: 600;
+    color: var(--accent-text); background: var(--accent);
+    border: none; border-radius: 10px; cursor: pointer;
+  }
+  .key-hint { font-size: 12px; color: var(--muted); margin: -10px 0 16px; }
+  .key-link { font-size: 13px; color: var(--muted); background: none; border: none; text-decoration: underline; cursor: pointer; margin: -8px 0 16px; display: block; }
+</style>
+
+<div class="wrap">
+  <h1>Nuan</h1>
+
+  <div id="keySetup">
+    <div class="key-row">
+      <input id="apiKeyInput" type="password" placeholder="Gemini APIキーを貼り付け" autocomplete="off">
+      <button id="saveKey">保存</button>
+    </div>
+    <p class="key-hint">このキーはあなたのブラウザの中だけに保存され、外部やこのファイルには一切送られません。</p>
+  </div>
+  <button id="changeKey" class="key-link" style="display:none">APIキーを変更する</button>
+
+  <textarea id="input" placeholder="ここに日本語または英語を入力"></textarea>
+
+  <div class="modes">
+    <button class="mode-btn active" data-mode="auto">自動</button>
+    <button class="mode-btn" data-mode="jp2en">日→英</button>
+    <button class="mode-btn" data-mode="en2jp">英→日</button>
+  </div>
+
+  <button id="go" class="translate-btn">翻訳する</button>
+  <div id="status" class="status"></div>
+  <div id="results"></div>
+
+  <div class="hist-head">
+    <h2>履歴</h2>
+    <button id="clearHist" class="clear-btn">すべて消す</button>
+  </div>
+  <div id="history"></div>
+</div>
+
+<script>
+  const MODEL = "gemini-2.5-flash"; // モデル名。もしエラーが出たら別名に変えて対応します。
+  const HIST_KEY = "nuance_translator_history_v1";
+  const API_KEY_STORAGE = "nuan_gemini_api_key"; // ブラウザの中だけに保存する（このファイルには書き込まない）
+
+  const inputEl = document.getElementById("input");
+  const statusEl = document.getElementById("status");
+  const resultsEl = document.getElementById("results");
+  const historyEl = document.getElementById("history");
+  const goBtn = document.getElementById("go");
+  const keySetupEl = document.getElementById("keySetup");
+  const changeKeyBtn = document.getElementById("changeKey");
+  const apiKeyInput = document.getElementById("apiKeyInput");
+
+  let mode = "auto"; // auto / jp2en / en2jp
+
+  // ===== APIキーの管理（ブラウザのローカルストレージにのみ保存。ファイルやサーバーには一切送らない） =====
+  function getApiKey() {
+    return localStorage.getItem(API_KEY_STORAGE) || "";
+  }
+  function showKeySetup(prefill) {
+    apiKeyInput.value = prefill || "";
+    keySetupEl.style.display = "";
+    changeKeyBtn.style.display = "none";
+  }
+  function hideKeySetup() {
+    keySetupEl.style.display = "none";
+    changeKeyBtn.style.display = "";
+  }
+  function refreshKeyUI() {
+    if (getApiKey()) { hideKeySetup(); } else { showKeySetup(); }
+  }
+  document.getElementById("saveKey").addEventListener("click", function () {
+    const v = apiKeyInput.value.trim();
+    if (!v) { return; }
+    localStorage.setItem(API_KEY_STORAGE, v);
+    hideKeySetup();
+    statusEl.className = "status";
+    statusEl.textContent = "APIキーを保存しました。";
+  });
+  changeKeyBtn.addEventListener("click", function () { showKeySetup(); });
+  refreshKeyUI();
+
+  // 方向切り替えボタン
+  document.querySelectorAll(".mode-btn").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      document.querySelectorAll(".mode-btn").forEach(function (b) { b.classList.remove("active"); });
+      btn.classList.add("active");
+      mode = btn.dataset.mode;
+    });
+  });
+
+  // 日本語が含まれるかどうかで方向を自動判定する
+  function detectDirection(text) {
+    return /[぀-ヿ㐀-鿿]/.test(text) ? "jp2en" : "en2jp";
+  }
+
+  // Geminiへ送る指示文（プロンプト）と、返してほしい形（スキーマ）を組み立てる
+  function buildBody(text, dir) {
+    let prompt, schema;
+    if (dir === "jp2en") {
+      prompt =
+        "あなたはプロの翻訳者です。次の日本語を英語に翻訳し、3つのスタイルで出力してください。\n" +
+        "- normal: 自然で標準的な英語\n" +
+        "- business: 接客・ビジネスで使える丁寧な英語\n" +
+        "- casual: 友達に話すような砕けたカジュアルな英語\n" +
+        "ニュアンスや語感を大切にしてください。各フィールドには翻訳文のみを入れ、引用符や説明は付けないでください。\n\n" +
+        "日本語: " + text;
+      schema = {
+        type: "object",
+        properties: { normal: { type: "string" }, business: { type: "string" }, casual: { type: "string" } },
+        required: ["normal", "business", "casual"]
+      };
+    } else {
+      prompt =
+        "あなたはプロの翻訳者です。次の英語を日本語に翻訳してください。\n" +
+        "元の英語の砕け具合・丁寧さ・トーンを日本語にも反映してください（カジュアルな英語ならカジュアルな日本語に、丁寧な英語なら丁寧な日本語に）。\n" +
+        "japaneseフィールドには翻訳文のみを入れ、説明は付けないでください。\n\n" +
+        "英語: " + text;
+      schema = { type: "object", properties: { japanese: { type: "string" } }, required: ["japanese"] };
+    }
+    return {
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: { temperature: 0.7, responseMimeType: "application/json", responseSchema: schema }
+    };
+  }
+
+  // Geminiを呼び出して結果（JSON）を返す
+  async function callGemini(text, dir) {
+    const url = "https://generativelanguage.googleapis.com/v1beta/models/" + MODEL + ":generateContent?key=" + getApiKey();
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(buildBody(text, dir))
+    });
+    if (!res.ok) {
+      const detail = await res.text();
+      throw new Error("APIエラー（" + res.status + "）: " + detail.slice(0, 200));
+    }
+    const data = await res.json();
+    const raw = data.candidates && data.candidates[0].content.parts[0].text;
+    return JSON.parse(raw);
+  }
+
+  // 結果カードを画面に表示する
+  function renderResults(dir, results, srcText) {
+    let cards = [];
+    if (dir === "jp2en") {
+      cards = [
+        { label: "Normal", text: results.normal },
+        { label: "Business", text: results.business },
+        { label: "Frank", text: results.casual }
+      ];
+    } else {
+      cards = [{ label: "Japanese", text: results.japanese }];
+    }
+    resultsEl.innerHTML = "";
+    cards.forEach(function (c) {
+      const card = document.createElement("div");
+      card.className = "card";
+      const label = document.createElement("div");
+      label.className = "card-label";
+      label.textContent = c.label;
+      const body = document.createElement("div");
+      body.className = "card-text";
+      body.textContent = c.text;
+      const btn = document.createElement("button");
+      btn.className = "copy-btn";
+      btn.textContent = "コピー";
+      // このボタンは、このカードの翻訳文だけをコピーする
+      btn.addEventListener("click", function () { copyText(c.text, btn); });
+      card.appendChild(label);
+      card.appendChild(body);
+      card.appendChild(btn);
+      resultsEl.appendChild(card);
+    });
+  }
+  window.renderResults = renderResults; // 動作確認用に外から呼べるようにしておく
+
+  // 翻訳文をクリップボードにコピーし、ボタンに「コピーしました」と表示
+  async function copyText(text, btn) {
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch (e) {
+      const ta = document.createElement("textarea");
+      ta.value = text; document.body.appendChild(ta); ta.select();
+      document.execCommand("copy"); document.body.removeChild(ta);
+    }
+    const old = btn.textContent;
+    btn.textContent = "コピーしました";
+    btn.classList.add("done");
+    setTimeout(function () { btn.textContent = old; btn.classList.remove("done"); }, 1400);
+  }
+
+  // 翻訳ボタンの処理
+  async function translate() {
+    const text = inputEl.value.trim();
+    if (!text) { statusEl.textContent = "文章を入力してください。"; return; }
+    if (!getApiKey()) {
+      statusEl.className = "status error";
+      statusEl.textContent = "上の欄にAPIキーを貼り付けて保存してください。";
+      showKeySetup();
+      return;
+    }
+    const dir = mode === "auto" ? detectDirection(text) : mode;
+    statusEl.className = "status";
+    statusEl.textContent = "翻訳中…";
+    goBtn.disabled = true;
+    try {
+      const results = await callGemini(text, dir);
+      renderResults(dir, results, text);
+      statusEl.textContent = "";
+      addHistory({ input: text, dir: dir, results: results, at: Date.now() });
+    } catch (e) {
+      statusEl.className = "status error";
+      statusEl.textContent = "失敗しました。" + e.message;
+    } finally {
+      goBtn.disabled = false;
+    }
+  }
+  goBtn.addEventListener("click", translate);
+
+  // ===== 履歴（ブラウザ内に無料で保存） =====
+  function loadHistory() {
+    try { return JSON.parse(localStorage.getItem(HIST_KEY)) || []; } catch (e) { return []; }
+  }
+  function saveHistory(list) { localStorage.setItem(HIST_KEY, JSON.stringify(list)); }
+  function addHistory(entry) {
+    const list = loadHistory();
+    list.unshift(entry);
+    saveHistory(list.slice(0, 30)); // 直近30件まで保存
+    renderHistory();
+  }
+  function renderHistory() {
+    const list = loadHistory();
+    historyEl.innerHTML = "";
+    if (list.length === 0) {
+      historyEl.innerHTML = '<div class="hist-empty">まだ履歴はありません。</div>';
+      return;
+    }
+    list.forEach(function (entry) {
+      const item = document.createElement("button");
+      item.className = "hist-item";
+      const label = document.createElement("span");
+      label.className = "hist-input";
+      label.textContent = entry.input;
+      const dir = document.createElement("span");
+      dir.className = "hist-dir";
+      dir.textContent = entry.dir === "jp2en" ? "日→英" : "英→日";
+      item.appendChild(label);
+      item.appendChild(dir);
+      // タップすると、その履歴をもう一度表示する（APIは呼ばないので無料）
+      item.addEventListener("click", function () {
+        inputEl.value = entry.input;
+        renderResults(entry.dir, entry.results, entry.input);
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      });
+      historyEl.appendChild(item);
+    });
+  }
+  document.getElementById("clearHist").addEventListener("click", function () {
+    if (confirm("履歴をすべて消しますか？")) { saveHistory([]); renderHistory(); }
+  });
+
+  renderHistory();
+</script>
