@@ -201,16 +201,24 @@
     let prompt, schema;
     if (dir === "jp2en") {
       prompt =
-        "あなたはプロの翻訳者です。次の日本語を英語に翻訳し、3つのスタイルで出力してください。\n" +
+        "あなたはプロの翻訳者です。次の日本語を英語に翻訳し、以下のスタイルで出力してください。\n" +
         "- normal: 自然で標準的な英語\n" +
         "- business: 接客・ビジネスで使える丁寧な英語\n" +
         "- casual: 友達に話すような砕けたカジュアルな英語\n" +
+        "- slang: casualとは明確に区別してください。casualは単なる話し言葉ですが、slangはネイティブが実際に使う特徴的なスラング表現・流行語・ネットスラング・Z世代言葉（例: fire, no cap, low-key, hits different など）そのものです。" +
+        "そうした際立った言い回しが自然に当てはまる時だけ入れてください。" +
+        "ビジネス・フォーマルな内容や、単に丁寧さを崩しただけの文には、無理にスラングをひねり出さず slang は空文字列 \"\" にしてください（空文字列にするのが正解のケースの方が多いです）。\n" +
         "ニュアンスや語感を大切にしてください。各フィールドには翻訳文のみを入れ、引用符や説明は付けないでください。\n\n" +
         "日本語: " + text;
       schema = {
         type: "object",
-        properties: { normal: { type: "string" }, business: { type: "string" }, casual: { type: "string" } },
-        required: ["normal", "business", "casual"]
+        properties: {
+          normal: { type: "string" },
+          business: { type: "string" },
+          casual: { type: "string" },
+          slang: { type: "string" }
+        },
+        required: ["normal", "business", "casual", "slang"]
       };
     } else {
       prompt =
@@ -252,6 +260,10 @@
         { label: "Business", text: results.business },
         { label: "Frank", text: results.casual }
       ];
+      // スラング・若者言葉は、該当するものがある時だけカードを追加する
+      if (results.slang && results.slang.trim()) {
+        cards.push({ label: "Slang", text: results.slang });
+      }
     } else {
       cards = [{ label: "Japanese", text: results.japanese }];
     }
